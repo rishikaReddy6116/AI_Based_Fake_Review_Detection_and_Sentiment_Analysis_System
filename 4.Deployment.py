@@ -1,95 +1,203 @@
-#LIBRARIES
+# ================= LIBRARIES =================
 import streamlit as st
 import pickle
 import nltk
 from textblob import TextBlob
 from nltk.corpus import stopwords
-from nltk.stem import  PorterStemmer 
+from nltk.stem import PorterStemmer
 import re
+import plotly.graph_objects as go
+import plotly.express as px
+import pandas as pd
 
-
-#LOAD PICKLE FILES
+# ================= LOAD MODEL FILES =================
 model = pickle.load(open('data and pickle files/best_model.pkl','rb')) 
 vectorizer = pickle.load(open('data and pickle files/count_vectorizer.pkl','rb')) 
 
-#FOR STREAMLIT
 nltk.download('stopwords')
 
-#TEXT PREPROCESSING
+# ================= TEXT PREPROCESSING =================
 sw = set(stopwords.words('english'))
+
 def text_preprocessing(text):
     txt = TextBlob(text)
     result = txt.correct()
+
     removed_special_characters = re.sub("[^a-zA-Z]", " ", str(result))
     tokens = removed_special_characters.lower().split()
+
     stemmer = PorterStemmer()
-    
     cleaned = []
-    stemmed = []
-    
+
     for token in tokens:
         if token not in sw:
-            cleaned.append(token)
-            
-    for token in cleaned:
-        token = stemmer.stem(token)
-        stemmed.append(token)
+            cleaned.append(stemmer.stem(token))
 
-    return " ".join(stemmed)
+    return " ".join(cleaned)
 
-#TEXT CLASSIFICATION
+# ================= FAKE REVIEW DETECTION =================
 def text_classification(text):
-    if len(text) < 1:
-        st.write("  ")
+    cleaned_review = text_preprocessing(text)
+    process = vectorizer.transform([cleaned_review]).toarray()
+
+    prediction = model.predict(process)
+    probability = model.predict_proba(process)
+
+    confidence = max(probability[0]) * 100
+
+    if prediction[0] == True:
+        st.success(f"✅ Legitimate Review (Confidence: {round(confidence,2)}%)")
+        return "Legitimate"
     else:
-        with st.spinner("Classification in progress..."):
-            cleaned_review = text_preprocessing(text)
+        st.error(f"❌ Fraudulent Review (Confidence: {round(confidence,2)}%)")
+        return "Fraudulent"
+
+# ================= SENTIMENT ANALYSIS =================
+def analyze_sentiment(review):
+    clean_review = text_preprocessing(review)
+    blob = TextBlob(clean_review)
+
+    polarity = blob.sentiment.polarity
+    subjectivity = blob.sentiment.subjectivity
+
+    return clean_review, polarity, subjectivity
+
+# ================= DASHBOARD =================
+def show_dashboard(polarity, subjectivity):
+
+    st.markdown("## 📊 Sentiment Dashboard")
+
+    fig_gauge = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=polarity,
+        title={'text': "Sentiment Polarity"},
+        gauge={'axis': {'range': [-1, 1]}}
+    ))
+    st.plotly_chart(fig_gauge)
+
+    df = pd.DataFrame({
+        "Metric": ["Polarity", "Subjectivity"],
+        "Value": [abs(polarity), subjectivity]
+    })
+
+    fig_bar = px.bar(df, x="Metric", y="Value", range_y=[0,1],
+                     title="Polarity vs Subjectivity")
+    st.plotly_chart(fig_bar)
+
+# ================= BATCH ANALYZER =================
+def batch_analyze_reviews(reviews_list):
+
+    results = []
+    polarities = []
+
+    for review in reviews_list:
+        if review.strip() != "":
+            cleaned_review = text_preprocessing(review)
             process = vectorizer.transform([cleaned_review]).toarray()
+
             prediction = model.predict(process)
-            p = ''.join(str(i) for i in prediction)
-        
-            if p == 'True':
-                st.success("The review entered is Legitimate.")
-            if p == 'False':
-                st.error("The review entered is Fraudulent.")
+            prob = model.predict_proba(process)
 
-#PAGE FORMATTING AND APPLICATION
+            confidence = max(prob[0]) * 100
+
+            blob = TextBlob(cleaned_review)
+            polarity = blob.sentiment.polarity
+
+            results.append({
+                "Review": review,
+                "Prediction": "Legitimate" if prediction[0] else "Fraudulent",
+                "Confidence (%)": round(confidence, 2),
+                "Polarity": round(polarity, 3)
+            })
+
+            polarities.append(polarity)
+
+    df = pd.DataFrame(results)
+
+    return df, polarities
+
+# ================= STREAMLIT APP =================
 def main():
-    st.title("Fraud Detection in Online Consumer Reviews Using Machine Learning Techniques")
-    
-    
-    # --EXPANDERS--    
-    abstract = st.expander("Abstract")
-    if abstract:
-        abstract.write("In today's world, both businesses and customers believe reviews to be quite beneficial. It's no surprise that review fraud has devalued the whole experience, from nasty reviews putting harm to the business's credibility to breaking international laws. This has been seen as a developing problem, and because it is related to natural language processing, it was critical to develop various machine learning methodologies and techniques to achieve a breakthrough in this sector. Many e-commerce sites, such as Amazon, have their systems in place, including Verified Purchase, which labels review language as accurate when items are purchased directly from the website. This work proposes to use Amazon's verified purchases label to train three classifiers for supervised training on Amazon’s labelled dataset. MNB, SVM, and LR were chosen as classifiers, and model tuning was done using two distinct vectorizers, Count Vectorizer and TF-IDF Vectorizers. Overall, all of the trained models had an accuracy rate of 80%, indicating that the vectorizers functioned admirably and that there are distinctions between false and actual reviews. Out of the two, the count vectorizer improved the models' performance more, and out of the three inside counts, LR performed the best, with an accuracy rate of 85% and a recall rate of 92%. The LR classifier was used, and it was accessible to the public to see if the reviews entered were genuine or not, with a probability score.")
-        #st.write(abstract)
-    
-    links = st.expander("Related Links")
-    if links:
-        links.write("[Dataset utilized](https://www.kaggle.com/akudnaver/amazon-reviews-dataset)")
-        links.write("[Github](https://github.com/kntb0107/Fraud-Detection-in-Online-Consumer-Reviews-Using-Machine-Learning-Techniques)")
-        
-    # --CHECKBOXES--
-    st.subheader("Information on the Classifier")
-    if st.checkbox("About Classifer"):
-        st.markdown('**Model:** Logistic Regression')
-        st.markdown('**Vectorizer:** Count')
-        st.markdown('**Test-Train splitting:** 40% - 60%')
-        st.markdown('**Spelling Correction Library:** TextBlob')
-        st.markdown('**Stemmer:** PorterStemmer')
-        
-    if st.checkbox("Evaluation Results"):
-        st.markdown('**Accuracy:** 85%')
-        st.markdown('**Precision:** 80%')
-        st.markdown('**Recall:** 92%')
-        st.markdown('**F-1 Score:** 85%')
 
+    st.title("🤖 AI Based Fake Review Detection and Sentiment Analysis System")
 
-    #--IMPLEMENTATION OF THE CLASSIFIER--
-    st.subheader("Fake Review Classifier")
-    review = st.text_area("Enter Review: ")
-    if st.button("Check"):
-        text_classification(review)
+    st.markdown("---")
 
-#RUN MAIN        
-main()
+    # ========== SINGLE REVIEW ==========
+    st.header("🔎 Single Review Analysis")
+
+    review = st.text_area("Enter Review Below:")
+
+    if st.button("Analyze Review"):
+
+        if review.strip() == "":
+            st.warning("Please enter a review.")
+        else:
+
+            st.subheader("Fake Review Detection")
+            result = text_classification(review)
+
+            st.markdown("---")
+
+            st.subheader("Sentiment Analysis")
+
+            clean_review, polarity, subjectivity = analyze_sentiment(review)
+
+            st.write("Cleaned Review:", clean_review)
+            st.write("Polarity Score:", round(polarity, 3))
+            st.write("Subjectivity Score:", round(subjectivity, 3))
+
+            st.markdown("---")
+            show_dashboard(polarity, subjectivity)
+
+    # ========== BATCH ANALYSIS ==========
+    st.markdown("---")
+    st.header("📦 Multi-Review Batch Analyzer")
+
+    batch_input = st.text_area(
+        "Paste multiple reviews (One review per line):",
+        height=200
+    )
+
+    if st.button("Analyze Batch Reviews"):
+
+        reviews_list = batch_input.split("\n")
+
+        df_results, polarities = batch_analyze_reviews(reviews_list)
+
+        if len(df_results) == 0:
+            st.warning("Please enter valid reviews.")
+        else:
+            st.subheader("Batch Analysis Results")
+            st.dataframe(df_results)
+
+            total = len(df_results)
+            legit_count = (df_results["Prediction"] == "Legitimate").sum()
+            fraud_count = (df_results["Prediction"] == "Fraudulent").sum()
+
+            avg_polarity = sum(polarities) / len(polarities)
+
+            st.subheader("Summary Statistics")
+            st.write("Total Reviews:", total)
+            st.write("Legitimate Reviews:", legit_count)
+            st.write("Fraudulent Reviews:", fraud_count)
+            st.write("Average Polarity:", round(avg_polarity, 3))
+
+            fig = px.pie(
+                names=["Legitimate", "Fraudulent"],
+                values=[legit_count, fraud_count],
+                title="Review Classification Distribution"
+            )
+            st.plotly_chart(fig)
+
+            fig2 = px.histogram(
+                df_results,
+                x="Polarity",
+                nbins=10,
+                title="Polarity Distribution"
+            )
+            st.plotly_chart(fig2)
+
+# ================= RUN APP =================
+if __name__ == "__main__":
+    main()
