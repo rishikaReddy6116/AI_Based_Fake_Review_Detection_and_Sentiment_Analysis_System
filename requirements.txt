@@ -3,6 +3,6 @@ matplotlib
 seaborn
 textblob
 nltk
-regex
 scikit-learn
 pickle-mixin
+plotly
