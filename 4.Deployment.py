@@ -1,11 +1,28 @@
 import streamlit as st
 
-# ✅ PAGE CONFIG (ONLY ONCE, AT TOP)
+# ✅ PAGE CONFIG (ONLY ONCE)
 st.set_page_config(page_title="Fake Review Detection", layout="wide")
 
 # ================= 🎨 FULL UI CSS =================
 st.markdown("""
 <style>
+
+/* 🚨 REMOVE TOP WHITE BAR COMPLETELY */
+header {display: none !important;}
+footer {display: none !important;}
+[data-testid="stToolbar"] {display: none !important;}
+[data-testid="stDecoration"] {display: none !important;}
+[data-testid="stStatusWidget"] {display: none !important;}
+
+/* 🚨 REMOVE TOP SPACE */
+.block-container {
+    padding-top: 0rem !important;
+    margin-top: 0rem !important;
+}
+
+section.main > div {
+    padding-top: 0rem !important;
+}
 
 /* 🌌 DARK BACKGROUND */
 .stApp {
@@ -16,7 +33,6 @@ st.markdown("""
 /* 🔵 SIDEBAR */
 section[data-testid="stSidebar"] {
     background: linear-gradient(180deg, #141e30, #243b55);
-    color: white;
 }
 
 section[data-testid="stSidebar"] * {
@@ -52,12 +68,11 @@ section[data-testid="stSidebar"] * {
 /* 🔘 BUTTON */
 .stButton>button {
     background: linear-gradient(135deg, #00e5ff, #2979ff);
-    color: white;
+    color: white !important;
     border-radius: 10px;
     padding: 10px 25px;
     font-size: 16px;
     border: none;
-    transition: 0.3s;
 }
 
 .stButton>button:hover {
@@ -82,10 +97,7 @@ st.sidebar.markdown("Select a module")
 # ================= 🏠 MAIN PAGE =================
 st.markdown("<br>", unsafe_allow_html=True)
 
-st.markdown(
-    '<p class="big-title">AI-Based Fake Review Detection and Sentiment Analysis System</p>',
-    unsafe_allow_html=True
-)
+st.title("AI-Based Fake Review Detection and Sentiment Analysis System")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -97,6 +109,7 @@ st.markdown("""
 <ul>
 <li>🔍 Detect Fake Reviews</li>
 <li>😊 Perform Sentiment Analysis</li>
+<li>🌍 Perform Multilingual Review Analysis</li>
 <li>📊 Analyze Multiple Reviews</li>
 <li>📄 Show Dashboard and Reports</li>
 </ul>

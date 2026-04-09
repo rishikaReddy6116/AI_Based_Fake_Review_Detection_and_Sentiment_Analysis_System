@@ -6,13 +6,12 @@ from textblob import TextBlob
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from scipy.sparse import hstack
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 
-translator = Translator()
-
+# Download once
 nltk.download('stopwords')
 
-# Load models
+# ===== LOAD MODELS =====
 model = pickle.load(open('data and pickle files/best_model.pkl','rb'))
 tfidf = pickle.load(open('data and pickle files/tfidf.pkl','rb'))
 feature_columns = pickle.load(open('data and pickle files/feature_columns.pkl','rb'))
@@ -27,10 +26,12 @@ def text_preprocessing(text):
     cleaned = [stemmer.stem(word) for word in tokens if word not in sw]
     return " ".join(cleaned)
 
-
+# ================= TRANSLATION =================
 def translate_to_english(text):
-    translated = translator.translate(text, dest='en')
-    return translated.text
+    try:
+        return GoogleTranslator(source='auto', target='en').translate(text)
+    except:
+        return text
 
 # ================= EXTRA FEATURES =================
 def extract_features(text):
@@ -46,12 +47,13 @@ def extract_features(text):
     }
     return pd.DataFrame([features])[feature_columns]
 
-# ================= FAKE REVIEW DETECTION =================
+# ================= MAIN MODEL FUNCTION =================
 def text_classification(text):
 
-    # 🌐 Translate first
+    # 🌐 Translate
     translated_text = translate_to_english(text)
 
+    # Preprocess
     cleaned_review = text_preprocessing(translated_text)
 
     # Vectorization
@@ -64,17 +66,16 @@ def text_classification(text):
     probability = model.predict_proba(final_input)
     confidence = max(probability[0]) * 100
 
-    # ================= RULE FEATURES =================
+    # RULE FEATURES
     words = translated_text.lower().split()
     repeated_words = len(words) - len(set(words))
     exclamations = translated_text.count('!')
     capitals = sum(1 for c in translated_text if c.isupper())
 
-    # Spam keywords
     spam_words = ["best", "amazing", "wow", "superb", "must", "buy", "100"]
     spam_count = sum(1 for w in words if w in spam_words)
 
-    # ================= SENTIMENT =================
+    # SENTIMENT
     blob = TextBlob(translated_text)
     polarity = blob.sentiment.polarity
 
@@ -84,7 +85,7 @@ def text_classification(text):
     neg_count = sum(1 for w in words if w in negative_words)
     pos_count = sum(1 for w in words if w in positive_words)
 
-    # ================= FRAUD SCORE =================
+    # FRAUD SCORE
     fraud_score = 0
 
     if repeated_words >= 1:
@@ -99,32 +100,29 @@ def text_classification(text):
         fraud_score += 10
 
     # ================= FINAL DECISION =================
-    if fraud_score >= 40:
-        prediction = "Fraudulent"
-        explanation = "Detected spam patterns (repetition/excessive punctuation/promotional words)."
-
-    elif polarity < -0.3:
+    if polarity < 0:
         prediction = "Legitimate"
-        explanation = "Negative but realistic user experience."
+        explanation = "Negative genuine review"
 
-    elif pos_count > 0 and neg_count > 0:
-        prediction = "Legitimate"
-        explanation = "Mixed opinion review (both positive and negative)."
-
-    elif polarity > 0.7 and spam_count >= 1:
+    elif fraud_score >= 60:
         prediction = "Fraudulent"
-        explanation = "Overly positive tone with promotional words."
+        explanation = "Spam patterns detected"
+
     elif pos_count > 0 and neg_count > 0:
         prediction = "Mixed"
-        explanation = "Review contains both positive and negative opinions."
+        explanation = "Contains both positive and negative opinions"
+
+    elif polarity > 0.85 and spam_count >= 2:
+        prediction = "Fraudulent"
+        explanation = "Overly promotional review"
 
     else:
         prediction = "Legitimate"
-        explanation = "Review appears normal."
+        explanation = "Looks genuine"
 
     return prediction, confidence, fraud_score, explanation
 
-# ================= SENTIMENT ANALYSIS =================
+# ================= SENTIMENT =================
 def analyze_sentiment(review):
     clean_review = text_preprocessing(review)
     blob = TextBlob(clean_review)

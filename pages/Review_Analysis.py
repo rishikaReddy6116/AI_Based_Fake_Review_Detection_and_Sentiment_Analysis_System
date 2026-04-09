@@ -1,13 +1,11 @@
 import streamlit as st
-from utils import text_classification, analyze_sentiment
-from googletrans import Translator
+from utils.model_utils import text_classification, analyze_sentiment
+from utils.style import apply_dark_theme
 
-translator = Translator()
+apply_dark_theme()
 
 # ===== UI HEADINGS =====
-st.markdown('<p class="big-title">AI Based Fake Review Detection and Sentiment Analysis System</p>', unsafe_allow_html=True)
-st.markdown("---")
-st.markdown('<p class="section-title">🔎 Single Review Analysis</p>', unsafe_allow_html=True)
+st.title("🔎 Single Review Analysis")
 
 # ===== INPUT =====
 review = st.text_area("Enter Review")
@@ -15,14 +13,10 @@ review = st.text_area("Enter Review")
 # ===== BUTTON =====
 if st.button("Analyze"):
 
-    # 🌍 Language Detection
-    lang = translator.detect(review).lang
-    st.write("🌐 Detected Language:", lang)
-
     # ===== MODEL OUTPUT =====
     result, confidence, fraud_score, explanation = text_classification(review)
 
-    # ===== RESULT DISPLAY (3 CASES) =====
+    # ===== RESULT DISPLAY =====
     if result == "Legitimate":
         st.markdown(
             f'<div class="result-box-legit">✅ Legitimate Review (Confidence: {round(confidence,2)}%)</div>',
@@ -37,7 +31,7 @@ if st.button("Analyze"):
 
     else:
         st.markdown(
-            f'<div style="background-color:#fff3cd;padding:15px;border-radius:10px;color:#856404;font-size:18px;">⚠️ Mixed / Neutral Review (Confidence: {round(confidence,2)}%)</div>',
+            f'<div class="result-box-mixed">⚠️ Mixed Review (Confidence: {round(confidence,2)}%)</div>',
             unsafe_allow_html=True
         )
 
@@ -45,7 +39,7 @@ if st.button("Analyze"):
     st.write("📊 Fraud Score:", fraud_score)
     st.write("💡 Explanation:", explanation)
 
-    # ===== FRAUD SCORE PROGRESS BAR =====
+    # ===== PROGRESS BAR =====
     st.progress(min(fraud_score / 100, 1.0))
 
     # ===== SENTIMENT =====
