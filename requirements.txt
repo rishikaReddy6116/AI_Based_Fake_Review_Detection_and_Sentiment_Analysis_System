@@ -7,4 +7,5 @@ regex
 scikit-learn
 pickle-mixin
 streamlit
+deep-translator
 plotly
